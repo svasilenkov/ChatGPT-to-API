@@ -79,7 +79,7 @@ func nightmare(c *gin.Context) {
 	response, err := chatgpt.SendRequest(translated_request, token)
 	if err != nil {
 		c.JSON(500, gin.H{
-			"error": "error sending request",
+			"error": "error sending request" + err.Error(),
 		})
 		return
 	}
@@ -90,7 +90,7 @@ func nightmare(c *gin.Context) {
 		err = json.NewDecoder(response.Body).Decode(&error_response)
 		if err != nil {
 			c.JSON(500, gin.H{"error": gin.H{
-				"message": "Unknown error",
+				"message": "Unknown error: " + err.Error(),
 				"type":    "internal_server_error",
 				"param":   nil,
 				"code":    "500",
