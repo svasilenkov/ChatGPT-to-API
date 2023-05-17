@@ -24,11 +24,11 @@ type ChatGPTRequest struct {
 	Model           string            `json:"model"`
 }
 
-func NewChatGPTRequest() ChatGPTRequest {
+func NewChatGPTRequest(model string) ChatGPTRequest {
 	return ChatGPTRequest{
 		Action:          "next",
 		ParentMessageID: uuid.NewString(),
-		Model:           "text-davinci-002-render-sha",
+		Model:           model,
 	}
 }
 
