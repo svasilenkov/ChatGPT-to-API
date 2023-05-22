@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"freechatgpt/internal/chatgpt"
 	"freechatgpt/internal/tokens"
 	typings "freechatgpt/internal/typings"
@@ -78,6 +79,7 @@ func nightmare(c *gin.Context) {
 
 	response, err := chatgpt.SendRequest(translated_request, token)
 	if err != nil {
+		fmt.Println(err.Error())
 		c.JSON(500, gin.H{
 			"error": "error sending request" + err.Error(),
 		})
@@ -105,6 +107,9 @@ func nightmare(c *gin.Context) {
 		}})
 		return
 	}
+	//bytes, err := ioutil.ReadAll(response.Body)
+	//fmt.Println(string(bytes))
+
 	// Create a bufio.Reader from the response body
 	reader := bufio.NewReader(response.Body)
 
@@ -139,10 +144,11 @@ func nightmare(c *gin.Context) {
 			if err != nil {
 				continue
 			}
+			fmt.Println(original_response)
 			if original_response.Error != nil {
 				return
 			}
-			if original_response.Message.Content.Parts[0] == "" || original_response.Message.Author.Role != "assistant" {
+			if len(original_response.Message.Content.Parts) == 0 || original_response.Message.Content.Parts[0] == "" || original_response.Message.Author.Role != "assistant" {
 				continue
 			}
 			if original_response.Message.Metadata.Timestamp == "absolute" {
