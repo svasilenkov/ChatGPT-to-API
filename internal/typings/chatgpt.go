@@ -2,7 +2,7 @@ package types
 
 import "github.com/google/uuid"
 
-type chatgpt_message struct {
+type Chatgpt_message struct {
 	ID      uuid.UUID       `json:"id"`
 	Author  chatgpt_author  `json:"author"`
 	Content chatgpt_content `json:"content"`
@@ -19,9 +19,17 @@ type chatgpt_author struct {
 
 type ChatGPTRequest struct {
 	Action          string            `json:"action"`
-	Messages        []chatgpt_message `json:"messages"`
+	Messages        []Chatgpt_message `json:"messages"`
 	ParentMessageID string            `json:"parent_message_id,omitempty"`
+	ConversationID  string            `json:"conversation_id,omitempty"`
 	Model           string            `json:"model"`
+}
+
+type ChatGPTContinueRequest struct {
+	Action          string `json:"action"`
+	ParentMessageID string `json:"parent_message_id,omitempty"`
+	ConversationID  string `json:"conversation_id,omitempty"`
+	Model           string `json:"model"`
 }
 
 func NewChatGPTRequest(model string) ChatGPTRequest {
@@ -33,7 +41,7 @@ func NewChatGPTRequest(model string) ChatGPTRequest {
 }
 
 func (c *ChatGPTRequest) AddMessage(role string, content string) {
-	c.Messages = append(c.Messages, chatgpt_message{
+	c.Messages = append(c.Messages, Chatgpt_message{
 		ID:      uuid.New(),
 		Author:  chatgpt_author{Role: role},
 		Content: chatgpt_content{ContentType: "text", Parts: []string{content}},

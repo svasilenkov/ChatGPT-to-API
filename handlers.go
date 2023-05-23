@@ -107,13 +107,12 @@ func nightmare(c *gin.Context) {
 		}})
 		return
 	}
-	//bytes, err := ioutil.ReadAll(response.Body)
-	//fmt.Println(string(bytes))
-
 	// Create a bufio.Reader from the response body
 	reader := bufio.NewReader(response.Body)
 
 	var fulltext string
+	lastMessageId := ""
+	var last_browser_metadata responses.Metadata
 
 	// Read the response byte by byte until a newline character is encountered
 	if original_request.Stream {
@@ -136,41 +135,56 @@ func nightmare(c *gin.Context) {
 		}
 		// Remove "data: " from the beginning of the line
 		line = line[6:]
-		// Check if line starts with [DONE]
-		if !strings.HasPrefix(line, "[DONE]") {
-			// Parse the line as JSON
-			var original_response responses.Data
-			err = json.Unmarshal([]byte(line), &original_response)
-			if err != nil {
-				continue
-			}
-			fmt.Println(original_response)
-			if original_response.Error != nil {
-				return
-			}
-			if len(original_response.Message.Content.Parts) == 0 || original_response.Message.Content.Parts[0] == "" || original_response.Message.Author.Role != "assistant" {
-				continue
-			}
-			if original_response.Message.Metadata.Timestamp == "absolute" {
-				continue
-			}
-			tmp_fulltext := original_response.Message.Content.Parts[0]
-			original_response.Message.Content.Parts[0] = strings.ReplaceAll(original_response.Message.Content.Parts[0], fulltext, "")
-			translated_response := responses.NewChatCompletionChunk(original_request.Model, original_response.Message.Content.Parts[0])
+		if strings.Contains(line, `"status": "finished_successfully"`) {
+			//fmt.Println(line)
+		}
+		var original_response responses.Data
 
-			// Stream the response to the client
-			response_string := translated_response.String()
-			if original_request.Stream {
-				_, err = c.Writer.WriteString("data: " + string(response_string) + "\n\n")
+		// Check if line starts with [DONE]
+		if strings.HasPrefix(line, "[DONE]") {
+			if original_response.Message.EndTurn == false {
+				// Try to continue
+				translated_request.Action = "continue"
+				translated_request.ParentMessageID = lastMessageId
+				translated_request.ConversationID = original_response.ConversationID
+				translated_request.Messages = nil
+				response, err = chatgpt.SendRequest(translated_request, token)
 				if err != nil {
+					fmt.Println(err.Error())
+					c.JSON(500, gin.H{
+						"error": "error sending request" + err.Error(),
+					})
 					return
 				}
-			}
+				defer response.Body.Close()
+				if response.StatusCode != 200 {
+					// Try read response body as JSON
+					var error_response map[string]interface{}
+					err = json.NewDecoder(response.Body).Decode(&error_response)
+					if err != nil {
+						c.JSON(500, gin.H{"error": gin.H{
+							"message": "Unknown error: " + err.Error(),
+							"type":    "internal_server_error",
+							"param":   nil,
+							"code":    "500",
+						}})
+						return
+					}
+					c.JSON(response.StatusCode, gin.H{"error": gin.H{
+						"message": error_response["detail"],
+						"type":    response.Status,
+						"param":   nil,
+						"code":    "error",
+					}})
+					return
+				}
+				//bytes, err := ioutil.ReadAll(response.Body)
+				//fmt.Println(string(bytes))
 
-			// Flush the response writer buffer to ensure that the client receives each line as it's written
-			c.Writer.Flush()
-			fulltext = tmp_fulltext
-		} else {
+				// Create a bufio.Reader from the response body
+				reader = bufio.NewReader(response.Body)
+				continue
+			}
 			if !original_request.Stream {
 				full_response := responses.NewChatCompletion(fulltext)
 				if err != nil {
@@ -181,10 +195,122 @@ func nightmare(c *gin.Context) {
 			}
 			final_line := responses.StopChunk(original_request.Model)
 			c.Writer.WriteString("data: " + final_line.String() + "\n\n")
+			//fmt.Println(final_line.String() + "\n")
 
 			c.String(200, "data: [DONE]\n\n")
 			return
 
+		} else {
+			// Parse the line as JSON
+			err = json.Unmarshal([]byte(line), &original_response)
+			if err != nil {
+				continue
+			}
+			isNewMesssage := false
+			if lastMessageId != original_response.Message.ID {
+				isNewMesssage = true
+			}
+			//fmt.Println(original_response)
+			if original_response.Error != nil {
+				// Try to continue
+				translated_request.Action = "continue"
+				translated_request.ParentMessageID = lastMessageId
+				translated_request.ConversationID = original_response.ConversationID
+				translated_request.Messages = nil
+				response, err = chatgpt.SendRequest(translated_request, token)
+				if err != nil {
+					fmt.Println(err.Error())
+					c.JSON(500, gin.H{
+						"error": "error sending request" + err.Error(),
+					})
+					return
+				}
+				defer response.Body.Close()
+				if response.StatusCode != 200 {
+					// Try read response body as JSON
+					var error_response map[string]interface{}
+					err = json.NewDecoder(response.Body).Decode(&error_response)
+					if err != nil {
+						c.JSON(500, gin.H{"error": gin.H{
+							"message": "Unknown error: " + err.Error(),
+							"type":    "internal_server_error",
+							"param":   nil,
+							"code":    "500",
+						}})
+						return
+					}
+					c.JSON(response.StatusCode, gin.H{"error": gin.H{
+						"message": error_response["detail"],
+						"type":    response.Status,
+						"param":   nil,
+						"code":    "error",
+					}})
+					return
+				}
+				//bytes, err := ioutil.ReadAll(response.Body)
+				//fmt.Println(string(bytes))
+
+				// Create a bufio.Reader from the response body
+				reader = bufio.NewReader(response.Body)
+				continue
+			}
+			if original_response.Message.Author.Role == "tool" &&
+				original_response.Message.Author.Name == "browser" &&
+				original_response.Message.Status == "finished_successfully" &&
+				len(original_response.Message.Metadata.CiteMetadata.MetaDataList) > 0 {
+				last_browser_metadata.CiteMetadata.MetaDataList = []responses.MetaDataListItem{}
+				for _, item := range original_response.Message.Metadata.CiteMetadata.MetaDataList {
+					last_browser_metadata.CiteMetadata.MetaDataList = append(last_browser_metadata.CiteMetadata.MetaDataList, item)
+				}
+			}
+			if original_response.Message.Author.Role != "assistant" {
+				continue
+			}
+			if original_response.Message.Metadata.Timestamp == "absolute" {
+				continue
+			}
+			translated_response := responses.ChatCompletionChunk{}
+
+			tmp_fulltext := ""
+
+			switch original_response.Message.Content.ContentType {
+			case "text":
+				if len(original_response.Message.Content.Parts) == 0 || original_response.Message.Content.Parts[0] == "" {
+					continue
+				}
+				tmp_fulltext = original_response.Message.Content.Parts[0]
+				original_response.Message.Content.Parts[0] = strings.ReplaceAll(original_response.Message.Content.Parts[0], fulltext, "")
+				translated_response = responses.NewChatCompletionChunk(original_request.Model, original_response.Message.Content.Parts[0])
+			case "code":
+				tmp_fulltext = original_response.Message.Content.Text
+
+				original_response.Message.Content.Text = strings.ReplaceAll(original_response.Message.Content.Text, fulltext, "")
+
+				text := original_response.Message.Content.Text
+				if isNewMesssage {
+					text = "```\n" + text
+				}
+				if original_response.Message.Status == "finished_successfully" {
+					metadataString, _ := json.Marshal(last_browser_metadata)
+					text += "\n{{{CODE_METADATA:" + string(metadataString) + "}}}```\n"
+				}
+				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
+			}
+
+			// Stream the response to the client
+			response_string := translated_response.String()
+			if original_request.Stream {
+				//fmt.Println(string(response_string) + "\n")
+				_, err = c.Writer.WriteString("data: " + string(response_string) + "\n\n")
+				if err != nil {
+					return
+				}
+			}
+
+			// Flush the response writer buffer to ensure that the client receives each line as it's written
+			c.Writer.Flush()
+			fulltext = tmp_fulltext
+			lastMessageId = original_response.Message.ID
 		}
 	}
 

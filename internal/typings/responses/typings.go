@@ -2,6 +2,20 @@ package responses
 
 import "encoding/json"
 
+type MetaDataListItem struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+}
+
+type CitationFormat struct {
+	Name string `json:"name"`
+}
+
+type CiteMetadata struct {
+	CitationFormat CitationFormat     `json:"citation_format"`
+	MetaDataList   []MetaDataListItem `json:"metadata_list"`
+}
+
 type Message struct {
 	ID         string      `json:"id"`
 	Author     Author      `json:"author"`
@@ -12,6 +26,7 @@ type Message struct {
 	Weight     float64     `json:"weight"`
 	Metadata   Metadata    `json:"metadata"`
 	Recipient  string      `json:"recipient"`
+	Status     string      `json:"status"`
 }
 
 type Author struct {
@@ -23,12 +38,15 @@ type Author struct {
 type Content struct {
 	ContentType string   `json:"content_type"`
 	Parts       []string `json:"parts"`
+	Language    string   `json:"language"`
+	Text        string   `json:"text"`
 }
 
 type Metadata struct {
-	Timestamp     string      `json:"timestamp_"`
-	MessageType   interface{} `json:"message_type"`
-	FinishDetails interface{} `json:"finish_details"`
+	Timestamp     string       `json:"timestamp_"`
+	MessageType   interface{}  `json:"message_type"`
+	FinishDetails interface{}  `json:"finish_details"`
+	CiteMetadata  CiteMetadata `json:"_cite_metadata"`
 }
 
 type Data struct {

@@ -71,11 +71,25 @@ func SendRequest(message typings.ChatGPTRequest, access_token string) (*http.Res
 	if API_REVERSE_PROXY != "" {
 		apiUrl = API_REVERSE_PROXY
 	}
-
-	// JSONify the body and add it to the request
-	body_json, err := json.Marshal(message)
-	if err != nil {
-		return &http.Response{}, err
+	body_json := []byte{}
+	err := error(nil)
+	if message.Action == "continue" {
+		message_continue := typings.ChatGPTContinueRequest{
+			Action:          "continue",
+			ParentMessageID: message.ParentMessageID,
+			ConversationID:  message.ConversationID,
+		}
+		// JSONify the body and add it to the request
+		body_json, err = json.Marshal(message_continue)
+		if err != nil {
+			return &http.Response{}, err
+		}
+	} else {
+		// JSONify the body and add it to the request
+		body_json, err = json.Marshal(message)
+		if err != nil {
+			return &http.Response{}, err
+		}
 	}
 
 	request, err := http.NewRequest(http.MethodPost, apiUrl, bytes.NewBuffer(body_json))
