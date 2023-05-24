@@ -211,7 +211,10 @@ func nightmare(c *gin.Context) {
 				isNewMesssage = true
 			}
 			//fmt.Println(original_response)
-			if original_response.Error != nil {
+			if original_response.Error != nil ||
+				(original_response.Message.Author.Name == "assistant" &&
+					original_response.Message.Status == "finished_successfully" &&
+					original_response.Message.Metadata.MessageType == "continue") {
 				// Try to continue
 				translated_request.Action = "continue"
 				translated_request.ParentMessageID = lastMessageId
@@ -280,7 +283,12 @@ func nightmare(c *gin.Context) {
 				}
 				tmp_fulltext = original_response.Message.Content.Parts[0]
 				original_response.Message.Content.Parts[0] = strings.ReplaceAll(original_response.Message.Content.Parts[0], fulltext, "")
-				translated_response = responses.NewChatCompletionChunk(original_request.Model, original_response.Message.Content.Parts[0])
+				text := original_response.Message.Content.Parts[0]
+				if original_response.Message.Status == "finished_successfully" {
+					metadataString, _ := json.Marshal(original_response.Message.Metadata)
+					text += "%%%TEXT_METADATA:" + string(metadataString) + "%%%"
+				}
+				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
 			case "code":
 				tmp_fulltext = original_response.Message.Content.Text
 
@@ -292,7 +300,7 @@ func nightmare(c *gin.Context) {
 				}
 				if original_response.Message.Status == "finished_successfully" {
 					metadataString, _ := json.Marshal(last_browser_metadata)
-					text += "\n{{{CODE_METADATA:" + string(metadataString) + "}}}```\n"
+					text += "\n%%%CODE_METADATA:" + string(metadataString) + "%%%```\n"
 				}
 				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
 			}
