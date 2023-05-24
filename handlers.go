@@ -136,7 +136,7 @@ func nightmare(c *gin.Context) {
 		// Remove "data: " from the beginning of the line
 		line = line[6:]
 		if strings.Contains(line, `"status": "finished_successfully"`) {
-			//fmt.Println(line)
+			//fmt.Println(line+" ")
 		}
 		var original_response responses.Data
 
