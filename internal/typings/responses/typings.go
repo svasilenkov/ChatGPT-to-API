@@ -42,11 +42,24 @@ type Content struct {
 	Text        string   `json:"text"`
 }
 
+type CitationMetadata struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+	Text  string `json:"text"`
+}
+
+type Citation struct {
+	StartIx  int              `json:"start_ix"`
+	EndIx    int              `json:"end_ix"`
+	Metadata CitationMetadata `json:"metadata"`
+}
+
 type Metadata struct {
 	Timestamp     string       `json:"timestamp_"`
 	MessageType   interface{}  `json:"message_type"`
 	FinishDetails interface{}  `json:"finish_details"`
 	CiteMetadata  CiteMetadata `json:"_cite_metadata"`
+	Citations     []Citation   `json:"citations"`
 }
 
 type Data struct {
