@@ -284,9 +284,14 @@ func nightmare(c *gin.Context) {
 				tmp_fulltext = original_response.Message.Content.Parts[0]
 				original_response.Message.Content.Parts[0] = strings.ReplaceAll(original_response.Message.Content.Parts[0], fulltext, "")
 				text := original_response.Message.Content.Parts[0]
-				if original_response.Message.Status == "finished_successfully" {
-					metadataString, _ := json.Marshal(original_response.Message.Metadata)
-					text += "%%%TEXT_METADATA:" + string(metadataString) + "%%%"
+				if original_request.Model == "gpt-4-browsing" {
+					if isNewMesssage {
+						text = "///text_message\n" + text
+					}
+					if original_response.Message.Status == "finished_successfully" {
+						metadataString, _ := json.Marshal(original_response.Message.Metadata)
+						text += "\n" + "%%%TEXT_METADATA:" + string(metadataString) + "%%%\n" + `\\\` + "\n"
+					}
 				}
 				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
 			case "code":
@@ -295,12 +300,14 @@ func nightmare(c *gin.Context) {
 				original_response.Message.Content.Text = strings.ReplaceAll(original_response.Message.Content.Text, fulltext, "")
 
 				text := original_response.Message.Content.Text
-				if isNewMesssage {
-					text = "```\n" + text
-				}
-				if original_response.Message.Status == "finished_successfully" {
-					metadataString, _ := json.Marshal(last_browser_metadata)
-					text += "\n%%%CODE_METADATA:" + string(metadataString) + "%%%```\n"
+				if original_request.Model == "gpt-4-browsing" {
+					if isNewMesssage {
+						metadataString, _ := json.Marshal(last_browser_metadata)
+						text = "///code_message\n%%%METADATA:" + string(metadataString) + "%%%" + text
+					}
+					if original_response.Message.Status == "finished_successfully" {
+						text += "\n" + `\\\` + "\n"
+					}
 				}
 				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
 			}
