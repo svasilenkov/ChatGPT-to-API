@@ -302,7 +302,7 @@ func nightmare(c *gin.Context) {
 						}
 
 						metadataString, _ := json.Marshal(last_browser_metadata)
-						text += "\n" + "%%%TEXT_METADATA:" + string(metadataString) + "%%%\n" + `\\\`
+						text += "\n" + "%%%TEXT_METADATA:" + string(metadataString) + "%%%\n" + `\\\` + "\n"
 					}
 				}
 				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
