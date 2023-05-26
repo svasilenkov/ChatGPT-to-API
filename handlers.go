@@ -136,7 +136,7 @@ func nightmare(c *gin.Context) {
 		// Remove "data: " from the beginning of the line
 		line = line[6:]
 		if strings.Contains(line, `"status": "finished_successfully"`) {
-			//fmt.Println(line+" ")
+			//fmt.Println(line + " ")
 		}
 		var original_response responses.Data
 
@@ -212,11 +212,16 @@ func nightmare(c *gin.Context) {
 			}
 			//fmt.Println(original_response)
 			if original_response.Error != nil ||
-				(original_response.Message.Author.Name == "assistant" &&
+				((original_response.Message.Author.Name == "assistant" ||
+					original_response.Message.Author.Role == "assistant") &&
 					original_response.Message.Status == "finished_successfully" &&
-					original_response.Message.Metadata.MessageType == "continue") {
+					original_response.Message.Metadata.MessageType == "continue" &&
+					original_response.Message.EndTurn == false) {
 				// Try to continue
 				translated_request.Action = "continue"
+				if translated_request.Model == "gpt-4-browsing" {
+					translated_request.Model = "gpt-4"
+				}
 				translated_request.ParentMessageID = lastMessageId
 				translated_request.ConversationID = original_response.ConversationID
 				translated_request.Messages = nil
@@ -289,8 +294,15 @@ func nightmare(c *gin.Context) {
 						text = "///text_message\n" + text
 					}
 					if original_response.Message.Status == "finished_successfully" {
-						metadataString, _ := json.Marshal(original_response.Message.Metadata)
-						text += "\n" + "%%%TEXT_METADATA:" + string(metadataString) + "%%%\n" + `\\\` + "\n"
+						if len(original_response.Message.Metadata.Citations) > 0 {
+							last_browser_metadata.Citations = []responses.Citation{}
+							for _, item := range original_response.Message.Metadata.Citations {
+								last_browser_metadata.Citations = append(last_browser_metadata.Citations, item)
+							}
+						}
+
+						metadataString, _ := json.Marshal(last_browser_metadata)
+						text += "\n" + "%%%TEXT_METADATA:" + string(metadataString) + "%%%\n" + `\\\`
 					}
 				}
 				translated_response = responses.NewChatCompletionChunk(original_request.Model, text)
@@ -303,7 +315,7 @@ func nightmare(c *gin.Context) {
 				if original_request.Model == "gpt-4-browsing" {
 					if isNewMesssage {
 						metadataString, _ := json.Marshal(last_browser_metadata)
-						text = "///code_message\n%%%METADATA:" + string(metadataString) + "%%%" + text
+						text = "///code_message\n%%%METADATA:" + string(metadataString) + "%%%" + text + "\n"
 					}
 					if original_response.Message.Status == "finished_successfully" {
 						text += "\n" + `\\\` + "\n"
